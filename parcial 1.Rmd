@@ -1,0 +1,199 @@
+---
+title: "Parcial virtual"
+author: "Sergio Carrero"
+date: '2022-05-16'
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+library(readxl)
+cosechaVARIEDADxy <- read_excel("C:/Users/master/Downloads/cosechaVARIEDADxy.xlsx")
+View(cosechaVARIEDADxy)
+library(spatialreg) ## Libreria que permite utilizar datos espaciales
+library(spdep) ## libreria de dependencia espacial, para crear matriz de pesos espaciales a partir de contiguidades de poligonos
+library(ape) ## lee, escribir, trazar y manipular arboles filogeneticos para hacer analisis comparativo
+library(sp) ## Clases y metodos para datos espciales y modelo 2D Y 3D.
+library(readxl)
+library(psych) #
+library(openxlsx)
+library(ggplot2) # generar graficos
+library(dplyr)
+```
+
+
+
+```{r cars}
+XCOSECHA_ <- read_excel("C:/Users/master/Downloads/cosechaVARIEDADxy.xlsx")
+View(XCOSECHA_)
+```
+
+
+```{r}
+
+names(XCOSECHA_)
+df <- XCOSECHA_
+```
+
+Se quieren comparar tratamientos
+
+Diseño Factorial Simple Completamente al Azar
+
+* Respuesta: COSECHA
+* Factor simple (3 niveles) completamente al azar: Variedad (A, B, C)
+
+$$H_0: \mu_{A} = \mu_{B} = \mu_{C}$$
+hipotesis nula: El promedio de cosecha es igual a la media de  la variedad A,B y C contra la hipotesis alterna que la nula es falsa(hipotesis de investigación). La variedad difere en algun punto de la cosecha.
+
+Parto del supuesto de que la investigación se hizo de la forma mas homogenea posible en la que no se vea afectada por caracteristicas particulares alternas, humedad, relieve ya que al ser un ambiente controlado evito situaciones de alteración por estas.
+### variable respuesta cantidad de cosecha.
+###cosecha= kg
+##n= 54 datos de cosecha. Siendo 18 datos para cada variedad. 
+
+```{r}
+
+library(ggplot2)
+ggplot(df)+
+  aes(x, y, fill=cosecha)+
+  geom_tile(color='black', width=0.8, height=0.8)+
+  geom_text(aes(label=variedad), color='white', size=5)
+```
+##grilla para hacer parcelas 6x9=54, X y Y solo nos dan las coordenadas y ggplot solo nos hace el grafico, geom_tile para dar interpretación en funcion de la cantidad de canabinoide, con geom_text puedo dar el nombre a cada cuadro dentro de la grilla.
+
+### Estadística descriptiva (Mostrar el comportamiento de la cosecha por variedad)
+
+```{r}
+ggplot(df)+
+  aes(variedad, cosecha, fill=variedad)+
+  geom_boxplot()+
+  geom_hline(yintercept = 5.2)
+```
+```{r}
+library(dplyr)
+
+df %>% 
+  group_by(variedad) %>% 
+  summarise(media=mean(cosecha),
+            desv=sd(cosecha),
+            cv=100*desv/media)
+```
+
+###Dplyr coeficientes de variación y medias.Nos da un resumen estadistico de la media, desviación y coeficiente de variación.
+
+### Estadistica Inferencial
+
+Modelo estadistico:
+
+$$y_{ij} = \mu + \tau_i + \epsilon_{ij}\\
+i=1,2,3;~j=1,2,\dots,24$$
+
+
+##24 repeticiónes e i=1-3 porque son 3 genotipos, el canabinoide esta en dos funciones (efecto genotipo  y otra que puede ser el ambiente, errores de medicion,etc ). Epsilon es el error residual, la concentración depende de todo el genotipo y el error por problemas en la extraccion del mismo.
+
+**Tecnica estadistica**: Análisis de Varianza
+
+
+
+
+
+```{r cars}
+mod1 = aov(cosecha ~ variedad, data = df)
+s_mod1 = summary(mod1)
+s_mod1
+```
+```{r cars}
+mod1 = aov(cosecha ~ variedad, data = df)
+s_mod1 = summary(mod1)
+p_valor = s_mod1[[1]][1,5]
+ifelse(p_valor<0.05, 'Rechazo Ho', 'NO Rechazo Ho')
+```
+##aov analisis de varianza para comparar el canabinoide de los 3 genotipos. 
+##si el p valor es menor que 0.005 rechazo la hipotesis nula.
+
+```{r}
+# Prueba de Tukey - para comparación de medias
+TukeyHSD(mod1, 'variedad')
+
+# Podemos concluir estadisticamente que hay diferentencias en cuanto al valor de cosecha entre las variedades A con respecto a B y C con respecto a A, p-valor menor a 0.05 en estos dos primeros y solo con analisis estadistico concluimos que al rechazar la HO la Ha es que no son iguales, por consiguiente todos son diferentes. Pero cabe destacar que la relación de C con respecto a B es que el p vaor es mayor a 0.05 por lo que no se deberia rechazar la Ho. 
+```
+
+# Revisando supuestos del modelo
+
+$$H_0: \mu_{A} = \mu_{B} = \mu_{C}$$
+
+H 0 : La varianza entre cada grupo es igual.
+
+H A : Al menos un grupo tiene una varianza que no es igual al resto.
+
+```{r cars}
+# Normalidad de residuales
+shapiro.test(mod1$residuals)
+
+# Igualdad de varianzas
+bartlett.test(mod1$residuals, df$variedad)
+```
+## normalidad de los residuales (Eij)= el residual se considera la distancia del dato que yo medi respecto al q es de acuerdo al modelo
+##Supuestos prueba de shapiro:
+H0: La variable presenta una distribución normal
+H1: La variable presenta una distribución no normal
+
+```{r}
+res_1 <- mod1$residuals
+shapiro.test(res_1)
+```
+
+```{r}
+plot(res_1, pch = 16)
+```
+#Dado que el valor p es menor que 0.05, el investigador rechazará la hipótesis nula. En otras palabras, tiene evidencia suficiente para decir que los tres grupos tienen variaciones diferentes con respecto a la prueba de barlett.
+
+```{r}
+###indice de moran
+library(ape)
+dist_matrix <-as.matrix(dist(cbind(x, y)))
+dist_matrix_inv <- 1/dist_matrix
+diag(dist_matrix_inv) <- 0
+Moran.I(mod1$residuals, dist_matrix_inv)
+plot(shapiro.test, pch = 16)
+```
+
+## Moran Index para residuales 
+
+```{r}
+matriz_dist <- as.matrix(dist(cbind(x = df$x, y = df$y)))
+
+dim(matriz_dist)
+```
+
+```{r}
+m_dist_inv <- 1/matriz_dist
+m_dist_inv[is.infinite(m_dist_inv)] <- 0
+diag(m_dist_inv) <- 0
+m_dist_inv
+```
+
+
+```{r}
+Moran.I(res_1, m_dist_inv) 
+```
+## el p-valor >0.05 NO hay dependencia especial.
+
+```{r}
+library(writexl)
+write_xlsx(df, 'datos_parcial.xlsx')
+
+library(openxlsx)
+write.xlsx(df, 'datos_parcial.xlsx')
+```
+
